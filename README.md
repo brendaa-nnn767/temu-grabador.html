@@ -1,2 +1,0 @@
-# temu-grabador.html
-temu

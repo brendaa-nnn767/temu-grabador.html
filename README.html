@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Grabador con Código de Barras</title>
+  <style>
+    video { width: 100%; max-width: 480px; border: 1px solid #ccc; }
+    button { margin: 5px; padding: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Grabador con código de barras</h2>
+  <video id="preview" autoplay muted playsinline></video><br>
+  <button id="start">🎥 Iniciar Grabación</button>
+  <button id="stop" disabled>🛑 Detener y Guardar</button>
+
+  <script type="module">
+    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.0.10/+esm';
+
+    const video = document.getElementById('preview');
+    const startBtn = document.getElementById('start');
+    const stopBtn = document.getElementById('stop');
+
+    let mediaRecorder;
+    let recordedChunks = [];
+    let barcodeValue = null;
+    const codeReader = new BrowserMultiFormatReader();
+
+    async function setupCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      video.srcObject = stream;
+      return stream;
+    }
+
+    async function detectBarcodeLive() {
+      try {
+        const result = await codeReader.decodeOnceFromVideoDevice(undefined, 'preview');
+        barcodeValue = result.text;
+        console.log('Código de barras detectado:', barcodeValue);
+      } catch (e) {
+        console.warn('No se detectó código de barras');
+      }
+    }
+
+    startBtn.onclick = async () => {
+      const stream = await setupCamera();
+      recordedChunks = [];
+      barcodeValue = null;
+
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+      };
+
+      mediaRecorder.start();
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+
+      // Intentar detectar código mientras se graba
+      detectBarcodeLive();
+    };
+
+    stopBtn.onclick = () => {
+      mediaRecorder.stop();
+      stopBtn.disabled = true;
+      startBtn.disabled = false;
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const fileName = (barcodeValue || 'video') + '.webm';
+
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        a.click();
+
+        alert('Video guardado como: ' + fileName);
+      };
+    };
+  </script>
+</body>
+</html>
